@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "BloomConvolutionTensorCore",
+	"Description": "",
+	"Category": "Other",
+	"CreatedBy": "xihaofu",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "BloomConvolutionTensorCore",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
