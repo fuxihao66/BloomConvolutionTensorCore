@@ -25,33 +25,38 @@ bool FBloomTensorCoreViewExtension::IsActiveThisFrame_Internal(const FSceneViewE
 {
 	return ViewExtensionIsActive;
 }
+void FBloomTensorCoreViewExtension::ResetConvolutionProperty(FConvolutionBloomSettings& ConvolutionSettings) {
 
+	Convolution = ConvolutionSettings;
+	if (Convolution.Texture)
+	{
+		KernelImg = Convolution.Texture->GetResource()->GetTexture2DResource()->TextureRHI; 
+		isKernelReset = true;
+	}
+}
 
 FRDGTextureRef FBloomTensorCoreViewExtension::ApplyBloomConvolutionTensorCore_RenderThread(
 	FRDGBuilder &GraphBuilder,
 	FRDGTextureRef SourceTexture)
 {
-	// if (SourceTexture == nullptr)
-	// {
-	// 	UE_LOG(LogBloomTensorCore, Warning, TEXT("Skipping null texture"));
-	// 	return SourceTexture;
-	// }
-
-	// uint32 TextureWidth = SourceTexture->Desc.Extent.X;
-	// uint32 TextureHeight = SourceTexture->Desc.Extent.Y;
+	if (SourceTexture == nullptr)
+	{
+		UE_LOG(LogBloomTensorCore, Warning, TEXT("Skipping null texture"));
+		return SourceTexture;
+	}
 	
-	// uint32 BufferWidth = 224;
-	// uint32 BufferHeight = 224;
+	uint32 TextureWidth = SourceTexture->Desc.Extent.X;
+	uint32 TextureHeight = SourceTexture->Desc.Extent.Y;
 
-	// auto SourceBuffer = DispatchTexture2Tensor(GraphBuilder, TextureWidth, TextureHeight, BufferWidth, BufferHeight, SourceTexture);
-	// FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(sizeof(uint16_t), BufferWidth * BufferHeight * 3); // half
-	// auto OutputBuffer = GraphBuilder.CreateBuffer(BufferDesc, TEXT("OutputTensor"));
+	if (isKernelReset){
+		ConvolvedKernel = DispatchKernelConv(GraphBuilder, KernelImg, TextureWidth, TextureHeight);
 
-	// myNetwork->CreateModelAndUploadData(GraphBuilder);
-	// myNetwork->ExecuteInference(GraphBuilder, 
-	// 	std::map<std::string, FRDGBufferRef>{ {"input1", SourceBuffer} }, OutputBuffer);
-	// return DispatchTensor2Texture(GraphBuilder, TextureWidth, TextureHeight, BufferWidth, BufferHeight, OutputBuffer, SourceTexture->Desc);
-    return SourceTexture;
+		isKernelReset = false;
+	}
+	
+	FRDGTextureRef DestTexture = DispatchBloomConvTensorCore(GraphBuilder, SourceTexture, ConvolvedKernel);
+
+    return DestTexture;
 }
 
 //------------------------------------------------------------------------------

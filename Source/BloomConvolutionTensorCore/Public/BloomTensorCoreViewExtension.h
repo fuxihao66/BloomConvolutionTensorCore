@@ -21,10 +21,15 @@ public:
 	// FScreenPassTexture AfterTonemap_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& InOutInputs);
 	FScreenPassTexture AfterCopySsrInput_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& InOutInputs);
 
+	void ResetConvolutionProperty(FConvolutionBloomSettings& ConvolutionSettings);
 private:
-
+	FRDGTextureRef ConvolvedKernel = nullptr;
+	FRDGTextureRef KernelImg = nullptr;
 	bool ViewExtensionIsActive;
-	
+	bool isKernelReset = true;
+
+	UPROPERTY(Interp, BlueprintReadWrite, Category = "Convolution Method")
+	FConvolutionBloomSettings Convolution;
 	/*int Width;
 	int Height;*/
 	FRDGTextureRef ApplyBloomConvolutionTensorCore_RenderThread(FRDGBuilder& GraphBuilder, FRDGTextureRef SourceTexture);

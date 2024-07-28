@@ -49,6 +49,7 @@ public class BloomConvolutionTensorCore : ModuleRules
 				"Engine",
 				"Slate",
                 "SlateCore",
+				"BloomTensorcoreExecuteRHI"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
@@ -58,6 +59,7 @@ public class BloomConvolutionTensorCore : ModuleRules
 			new string[]
 			{
 				// ... add any modules that your module loads dynamically here ...
+				"BloomTensorcoreExecuteD3D12RHI"
 			}
 			);
 	}
