@@ -24,7 +24,7 @@ public:
 	void ResetConvolutionProperty(FConvolutionBloomSettings& ConvolutionSettings);
 private:
 	FRDGTextureRef ConvolvedKernel = nullptr;
-	FRDGTextureRef KernelImg = nullptr;
+	FTexture2DRHIRef KernelImg = nullptr;
 	bool ViewExtensionIsActive;
 	bool isKernelReset = true;
 
@@ -32,7 +32,7 @@ private:
 	FConvolutionBloomSettings Convolution;
 	/*int Width;
 	int Height;*/
-	FRDGTextureRef ApplyBloomConvolutionTensorCore_RenderThread(FRDGBuilder& GraphBuilder, FRDGTextureRef SourceTexture);
+	FRDGTextureRef ApplyBloomConvolutionTensorCore_RenderThread(FRDGBuilder& GraphBuilder, FRDGTextureRef SourceTexture,const FIntRect& ViewportSize);
 
 protected:
 	FScreenPassTexture ApplyBloomConvolutionTensorCore(FRDGBuilder& GraphBuilder, const FPostProcessMaterialInputs& InOutInputs);

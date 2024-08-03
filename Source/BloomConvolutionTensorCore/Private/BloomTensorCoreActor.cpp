@@ -4,7 +4,8 @@
 
 ABloomTensorCoreActor::ABloomTensorCoreActor()
 {
-    
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
 ABloomTensorCoreActor::~ABloomTensorCoreActor()
@@ -13,16 +14,20 @@ ABloomTensorCoreActor::~ABloomTensorCoreActor()
 }
 
 void ABloomTensorCoreActor::EndPlay(const EEndPlayReason::Type EndPlayReason) {
-
+    Super::EndPlay(EndPlayReason);
 }
-void ABloomTensorCoreActor::Tick( float DeltaSeconds ){
 
-    if (!BloomTensorCoreViewExtension && isEnabled)
+void ABloomTensorCoreActor::Tick( float DeltaTime){
+    AActor::Tick(DeltaTime);
+    if (!BloomTensorCoreViewExtension && isEnabled) {
         BloomTensorCoreViewExtension = FSceneViewExtensions::NewExtension<FBloomTensorCoreViewExtension>();
+        
+        BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
         if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
         {
             CVarDebugCanvasVisible->Set(0);
         }
+    }
     else if (BloomTensorCoreViewExtension && !isEnabled){
         BloomTensorCoreViewExtension = nullptr;
 
@@ -34,10 +39,13 @@ void ABloomTensorCoreActor::Tick( float DeltaSeconds ){
 }
 
 void ABloomTensorCoreActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) {
-    BloomTensorCoreViewExtension.ResetConvolutionProperty(Convolution);
+    if (BloomTensorCoreViewExtension)
+        BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
 }
 void ABloomTensorCoreActor::BeginPlay(){
 
+    Super::BeginPlay();
+    //RegisterActorTickFunctions(true);
     // if (BloomConvolutionTexture == nullptr)
     // {
     //     GEngine->LoadDefaultBloomTexture();

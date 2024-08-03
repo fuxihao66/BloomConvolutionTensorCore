@@ -58,8 +58,9 @@ public class BloomTensorcoreExecuteD3D12RHI : ModuleRules
 		// those come from the D3D12RHI
 		AddEngineThirdPartyPrivateStaticDependencies(Target, "DX12");
 
+		PublicDefinitions.Add("WITH_NVAPI=0");
 		PublicDefinitions.Add("NV_AFTERMATH=0");
-		PublicDefinitions.Add("INTEL_EXTENSIONS=0");
+        PublicDefinitions.Add("INTEL_EXTENSIONS=0");
 		// AddEngineThirdPartyPrivateStaticDependencies(Target, "NVAPI");
 		// AddEngineThirdPartyPrivateStaticDependencies(Target, "NVAftermath");
 		// AddEngineThirdPartyPrivateStaticDependencies(Target, "IntelMetricsDiscovery");

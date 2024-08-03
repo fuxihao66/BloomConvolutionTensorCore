@@ -26,14 +26,15 @@ struct FBloomTensorcoreExecuteRHICreateArguments
 
 struct FBloomRHIExecuteArguments
 {
-	FRHITexture2D* SrcTexture = nullptr; 
-	FRHITexture2D* KernelTexture = nullptr; 
-	FRHITexture2D* Intermediate0 = nullptr; 
-	FRHITexture2D* Intermediate1 = nullptr; 
+	FRHITexture* SrcTexture = nullptr; 
+	FRHITexture* KernelTexture = nullptr; 
+	FRHITexture* Intermediate0 = nullptr; 
+	FRHITexture* Intermediate1 = nullptr; 
 	FRHIUnorderedAccessView* OutputTexture = nullptr; 
 	FRHIUnorderedAccessView* Intermediate0_UAV = nullptr; 
 	FRHIUnorderedAccessView* Intermediate1_UAV = nullptr; 
-
+	uint32 ViewportWidth;
+	uint32 ViewportHeight;
 	uint32 GPUNode = 0;
 	uint32 GPUVisibility = 0;
 };

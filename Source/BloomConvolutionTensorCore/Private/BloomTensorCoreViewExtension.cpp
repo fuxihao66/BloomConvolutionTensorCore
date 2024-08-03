@@ -1,6 +1,9 @@
 
 #include "BloomTensorCoreViewExtension.h"
 
+#include "BloomConvolutionPass.h"
+#include "TextureResource.h"
+#include "Classes/Engine/Texture.h"
 #include "Modules/ModuleManager.h"
 #include "PostProcess/PostProcessMaterial.h"
 #include "PostProcess/SceneRenderTargets.h"
@@ -30,14 +33,15 @@ void FBloomTensorCoreViewExtension::ResetConvolutionProperty(FConvolutionBloomSe
 	Convolution = ConvolutionSettings;
 	if (Convolution.Texture)
 	{
-		KernelImg = Convolution.Texture->GetResource()->GetTexture2DResource()->TextureRHI; 
+		KernelImg = Convolution.Texture->GetResource()->TextureRHI->GetTexture2D();
 		isKernelReset = true;
 	}
 }
 
 FRDGTextureRef FBloomTensorCoreViewExtension::ApplyBloomConvolutionTensorCore_RenderThread(
 	FRDGBuilder &GraphBuilder,
-	FRDGTextureRef SourceTexture)
+	FRDGTextureRef SourceTexture,
+	const FIntRect& ViewportSize)
 {
 	if (SourceTexture == nullptr)
 	{
@@ -49,12 +53,14 @@ FRDGTextureRef FBloomTensorCoreViewExtension::ApplyBloomConvolutionTensorCore_Re
 	uint32 TextureHeight = SourceTexture->Desc.Extent.Y;
 
 	if (isKernelReset){
-		ConvolvedKernel = DispatchKernelConv(GraphBuilder, KernelImg, TextureWidth, TextureHeight);
+		FRDGTextureRef SpatialKernelTexture = RegisterExternalTexture(GraphBuilder, KernelImg, TEXT("Kernel"));
+
+		ConvolvedKernel = DispatchManager::DispatchKernelConv(GraphBuilder, SpatialKernelTexture, TextureWidth, TextureHeight, ViewportSize);
 
 		isKernelReset = false;
 	}
 	
-	FRDGTextureRef DestTexture = DispatchBloomConvTensorCore(GraphBuilder, SourceTexture, ConvolvedKernel);
+	FRDGTextureRef DestTexture = DispatchManager::DispatchBloomConvTensorCore(GraphBuilder, SourceTexture, ConvolvedKernel, TextureWidth, TextureHeight, ViewportSize);
 
     return DestTexture;
 }
@@ -91,7 +97,8 @@ FScreenPassTexture FBloomTensorCoreViewExtension::ApplyBloomConvolutionTensorCor
 		ReturnTexture = const_cast<FScreenPassTexture &>(InOutInputs.Textures[(uint32)EPostProcessMaterialInput::SceneColor]);
 	}
 	
-	ReturnTexture.Texture = ApplyBloomConvolutionTensorCore_RenderThread(GraphBuilder, InputTexture);
+	
+	ReturnTexture.Texture = ApplyBloomConvolutionTensorCore_RenderThread(GraphBuilder, InputTexture, InOutInputs.Textures[(uint32)EPostProcessMaterialInput::SceneColor].ViewRect);
 
 	return ReturnTexture;
 }

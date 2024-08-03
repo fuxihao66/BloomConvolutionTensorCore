@@ -12,7 +12,7 @@ UCLASS()
 class BLOOMCONVOLUTIONTENSORCORE_API ABloomTensorCoreActor : public AActor
 {
     GENERATED_BODY()
-    
+public:
     UPROPERTY(Interp, BlueprintReadWrite, Category = "Convolution Method")
 	FConvolutionBloomSettings Convolution;
 

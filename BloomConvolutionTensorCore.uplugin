@@ -17,8 +17,24 @@
 	"Modules": [
 		{
 			"Name": "BloomConvolutionTensorCore",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "PostEngineInit"
+		},
+		{
+			"Name": "BloomTensorcoreExecuteRHI",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "BloomTensorcoreExecuteD3D12RHI",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [
+				"Win64"
+			]
 		}
 	]
 }

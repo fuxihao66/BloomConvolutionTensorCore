@@ -21,6 +21,8 @@ public class BloomConvolutionTensorCore : ModuleRules
 		PrivateIncludePaths.AddRange(
 			new string[] {
                 Path.Combine(EngineDirectory, "Source/Runtime/Renderer/Private"),
+                Path.Combine(EngineDirectory, "Source/Runtime/Engine/Private"),
+                Path.Combine(EngineDirectory, "Source/Runtime/Engine"),
 				// ... add other private include paths required here ...
 			}
 			);
@@ -45,7 +47,11 @@ public class BloomConvolutionTensorCore : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
+                "Core",
+                "CoreUObject",
+                "EngineSettings",
+                "RenderCore",
+                "Renderer",
 				"Engine",
 				"Slate",
                 "SlateCore",

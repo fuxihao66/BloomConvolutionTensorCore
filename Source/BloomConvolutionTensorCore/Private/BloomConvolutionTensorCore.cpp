@@ -1,7 +1,13 @@
 #include "BloomConvolutionTensorCore.h"
 
-#define LOCTEXT_NAMESPACE "FBloomConvolutionTensorCoreModule"
+#include "CoreMinimal.h"
+#include "GeneralProjectSettings.h"
 
+#include "Interfaces/IPluginManager.h"
+
+#define LOCTEXT_NAMESPACE "FBloomConvolutionTensorCoreModule"
+DECLARE_LOG_CATEGORY_EXTERN(LogBloomConvolutionTensorCore, Verbose, All);
+DEFINE_LOG_CATEGORY(LogBloomConvolutionTensorCore);
 void FBloomConvolutionTensorCoreModule::StartupModule() 
 {
     
@@ -26,7 +32,7 @@ void FBloomConvolutionTensorCoreModule::StartupModule()
 		BloomTensorcoreExecuteRHIExtensions = RHIModule->CreateBloomTensorcoreExecuteRHI(Arguments);
 	}
 	else{
-		// UE_LOG(LogODI, Log, TEXT("ODI does not support %s RHI"), *RHIName);
+		UE_LOG(LogBloomConvolutionTensorCore, Log, TEXT("Plugin does not support %s RHI"), *RHIName);
 	}
 }
 BloomTensorcoreExecuteRHI* FBloomConvolutionTensorCoreModule::GetBloomTensorcoreExecuteRHIRef(){
