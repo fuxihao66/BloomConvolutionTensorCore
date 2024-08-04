@@ -52,13 +52,14 @@ FRDGTextureRef FBloomTensorCoreViewExtension::ApplyBloomConvolutionTensorCore_Re
 	uint32 TextureWidth = SourceTexture->Desc.Extent.X;
 	uint32 TextureHeight = SourceTexture->Desc.Extent.Y;
 
-	if (isKernelReset){
+	/*if (isKernelReset)
+	{*/
 		FRDGTextureRef SpatialKernelTexture = RegisterExternalTexture(GraphBuilder, KernelImg, TEXT("Kernel"));
 
-		ConvolvedKernel = DispatchManager::DispatchKernelConv(GraphBuilder, SpatialKernelTexture, TextureWidth, TextureHeight, ViewportSize);
+		FRDGTextureRef ConvolvedKernel = DispatchManager::DispatchKernelConv(GraphBuilder, SpatialKernelTexture, TextureWidth, TextureHeight, ViewportSize);
 
-		isKernelReset = false;
-	}
+		//isKernelReset = false;
+	//}
 	
 	FRDGTextureRef DestTexture = DispatchManager::DispatchBloomConvTensorCore(GraphBuilder, SourceTexture, ConvolvedKernel, TextureWidth, TextureHeight, ViewportSize);
 

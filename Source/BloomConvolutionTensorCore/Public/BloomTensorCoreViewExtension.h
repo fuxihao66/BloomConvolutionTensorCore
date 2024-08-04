@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 
 
@@ -23,7 +23,7 @@ public:
 
 	void ResetConvolutionProperty(FConvolutionBloomSettings& ConvolutionSettings);
 private:
-	FRDGTextureRef ConvolvedKernel = nullptr;
+	//FRDGTextureRef ConvolvedKernel = nullptr;// TODO: 需要注册为外部texture
 	FTexture2DRHIRef KernelImg = nullptr;
 	bool ViewExtensionIsActive;
 	bool isKernelReset = true;

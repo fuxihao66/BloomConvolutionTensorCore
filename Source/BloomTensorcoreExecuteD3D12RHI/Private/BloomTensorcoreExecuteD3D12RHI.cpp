@@ -263,8 +263,8 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		StateCache.GetDescriptorCache()->GetCurrentSamplerHeap()->GetHeap(),
 	};*/
 
-	FD3D12Device* Device = static_cast<FD3D12DynamicRHI*>(D3D12RHI)->GetAdapter().GetDevice(CmdList.GetGPUMask().ToIndex());
-	FD3D12CommandContext& DefaultContext = Device->GetDefaultCommandContext();
+	/*FD3D12Device* Device = InternalD3D12RHI->GetAdapter().GetDevice(CmdList.GetGPUMask().ToIndex());
+	FD3D12CommandContext& DefaultContext = Device->GetDefaultCommandContext();*/
 
 	const uint32 DeviceIndex = D3D12RHI->RHIGetResourceDeviceIndex(InArguments.SrcTexture);
 	ID3D12GraphicsCommandList* D3DGraphicsCommandList = D3D12RHI->RHIGetGraphicsCommandList(DeviceIndex);
@@ -277,10 +277,14 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	FD3D12Texture* const KernelTextureD3D12 = (FD3D12Texture* const)(InArguments.KernelTexture);
 	FD3D12Texture* const IntermediateTexture0D3D12 = (FD3D12Texture* const)(InArguments.Intermediate0);
 	FD3D12Texture* const IntermediateTexture1D3D12 = (FD3D12Texture* const)(InArguments.Intermediate1);
-	FD3D12UnorderedAccessView* const OutputUAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.OutputTexture);
-	FD3D12UnorderedAccessView* const Intermediate0_UAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.Intermediate0_UAV);
-	FD3D12UnorderedAccessView* const Intermediate1_UAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.Intermediate1_UAV);
+	/*FD3D12UnorderedAccessView* OutputUAV = DefaultContext.RetrieveObject<>(InArguments.OutputTexture);
+	FD3D12UnorderedAccessView* Intermediate0_UAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.Intermediate0_UAV);
+	FD3D12UnorderedAccessView* Intermediate1_UAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.Intermediate1_UAV);*/
 
+	FD3D12UnorderedAccessView* const OutputUAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.OutputTexture);
+	FD3D12UnorderedAccessView* const Intermediate0_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate0_UAV);
+	FD3D12UnorderedAccessView* const Intermediate1_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate1_UAV);
+	
 	auto SrcSrvHandle = SrcTextureD3D12->GetShaderResourceView()->GetOfflineCpuHandle();
 	auto KernelSrvHandle = KernelTextureD3D12->GetShaderResourceView()->GetOfflineCpuHandle();
 	auto Intermediate0SrvHandle = IntermediateTexture0D3D12->GetShaderResourceView()->GetOfflineCpuHandle();
