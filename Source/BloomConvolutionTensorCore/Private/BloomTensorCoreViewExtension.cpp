@@ -78,6 +78,7 @@ void FBloomTensorCoreViewExtension::SubscribeToPostProcessingPass(EPostProcessin
 	if (PassId == EPostProcessingPass::SSRInput) {
 		InOutPassCallbacks.Add(FAfterPassCallbackDelegate::CreateRaw(this, &FBloomTensorCoreViewExtension::AfterCopySsrInput_RenderThread));
 	}
+	// TODO: replace ue original tonemap
 }
 
 //------------------------------------------------------------------------------
