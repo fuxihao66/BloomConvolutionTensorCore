@@ -21,18 +21,11 @@ SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Intermediate1)
 
 END_SHADER_PARAMETER_STRUCT()
 
-// COPY FROM UE
-FRDGTextureRef DispatchManager::DispatchKernelConv(FRDGBuilder& GraphBuilder,
-	FRDGTextureRef InputKernel, uint32 TextureWidth, uint32 TextureHeight, const FIntRect& ViewportSize) {
+void DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBuilder,
+	FRDGTextureRef ConvolvedKernel, FRDGTextureRef SourceTexture, FRDGTextureRef DestTexture, uint32 TextureWidth, uint32 TextureHeight, const FIntRect& ViewportSize){
 
-    return InputKernel;
-}
-
-FRDGTextureRef DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBuilder,
-	FRDGTextureRef ConvolvedKernel, FRDGTextureRef SourceTexture, uint32 TextureWidth, uint32 TextureHeight, const FIntRect& ViewportSize){
-
-    FRDGTextureDesc OutputTextureDesc = FRDGTextureDesc::Create2D({ (int)TextureWidth ,(int)TextureHeight }, PF_A16B16G16R16, FClearValueBinding::Black, TexCreate_UAV);
-	auto OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Bloom Output"));
+    /*FRDGTextureDesc OutputTextureDesc = FRDGTextureDesc::Create2D({ (int)TextureWidth ,(int)TextureHeight }, PF_A16B16G16R16, FClearValueBinding::Black, TexCreate_UAV);
+	auto OutputTexture = GraphBuilder.CreateTexture(OutputTextureDesc, TEXT("Bloom Output"));*/
 
     uint32 PaddedWidth = 1 << FMath::CeilToInt(FMath::Log2((float)TextureWidth));
 
@@ -51,7 +44,7 @@ FRDGTextureRef DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBu
     FTensorcoreBloomParameters* PassParameters = GraphBuilder.AllocParameters<FTensorcoreBloomParameters>();
     PassParameters->SrcTexture = SourceTexture;
     PassParameters->KernelSpectrum = ConvolvedKernel;
-    PassParameters->DstTexture = GraphBuilder.CreateUAV(OutputTexture);
+    PassParameters->DstTexture = GraphBuilder.CreateUAV(DestTexture);
     PassParameters->Intermediate0 = GraphBuilder.CreateUAV(IntermediateTexture0);
     PassParameters->Intermediate1 = GraphBuilder.CreateUAV(IntermediateTexture1);
 	
@@ -62,7 +55,7 @@ FRDGTextureRef DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBu
         PassParameters,
         ERDGPassFlags::Compute | ERDGPassFlags::Raster | ERDGPassFlags::NeverCull | ERDGPassFlags::SkipRenderPass,
         [LocalRHIExtensions, PassParameters, SourceTexture, ConvolvedKernel, 
-            OutputTexture, IntermediateTexture0, IntermediateTexture1, ViewportSize](FRHICommandListImmediate& RHICmdList)
+            IntermediateTexture0, IntermediateTexture1, ViewportSize](FRHICommandListImmediate& RHICmdList)
     {
 		PassParameters->SrcTexture->MarkResourceAsUsed();
 		PassParameters->KernelSpectrum->MarkResourceAsUsed();
@@ -92,6 +85,5 @@ FRDGTextureRef DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBu
         });
     });
 
-	return OutputTexture;
             
 }

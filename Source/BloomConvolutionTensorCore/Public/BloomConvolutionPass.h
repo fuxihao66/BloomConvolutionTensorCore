@@ -5,11 +5,8 @@
 
 class BLOOMCONVOLUTIONTENSORCORE_API DispatchManager {
 public:
-	static FRDGTextureRef DispatchKernelConv(FRDGBuilder& GraphBuilder,
-		FRDGTextureRef InputKernel, uint32 TextureWidth, uint32 TextureHeight, const FIntRect& ViewportSize);
-
-	static FRDGTextureRef DispatchBloomConvTensorCore(FRDGBuilder& GraphBuilder,
-		FRDGTextureRef ConvolvedKernel, FRDGTextureRef SourceTexture,
+	static void DispatchBloomConvTensorCore(FRDGBuilder& GraphBuilder,
+		FRDGTextureRef ConvolvedKernel, FRDGTextureRef SourceTexture, FRDGTextureRef DestTexture,
 		uint32 TextureWidth, uint32 TextureHeight, const FIntRect& ViewportSize);
 //private:
 //	static BloomTensorcoreExecuteRHI* m_RHIExtensions;

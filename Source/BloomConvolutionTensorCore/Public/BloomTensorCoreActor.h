@@ -4,7 +4,6 @@
 #include "SceneViewExtension.h"
 
 //#include "Windows/AllowWindowsPlatformTypes.h"
-#include "BloomTensorCoreViewExtension.h"
 
 #include "BloomTensorCoreActor.generated.h"
 
@@ -13,9 +12,9 @@ class BLOOMCONVOLUTIONTENSORCORE_API ABloomTensorCoreActor : public AActor
 {
     GENERATED_BODY()
 public:
-    UPROPERTY(Interp, BlueprintReadWrite, Category = "Convolution Method")
-	FConvolutionBloomSettings Convolution;
-
+//    UPROPERTY(Interp, BlueprintReadWrite, Category = "Convolution Method")
+//	FConvolutionBloomSettings Convolution;
+//
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Convolution")
 	bool isEnabled;
 public:
@@ -35,6 +34,6 @@ public:
 
 public:
 
-    TSharedPtr<FBloomTensorCoreViewExtension, ESPMode::ThreadSafe> BloomTensorCoreViewExtension;
+    //TSharedPtr<FBloomTensorCoreViewExtension, ESPMode::ThreadSafe> BloomTensorCoreViewExtension;
 
 };

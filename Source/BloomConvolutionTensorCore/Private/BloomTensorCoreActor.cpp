@@ -1,11 +1,11 @@
 #include "BloomTensorCoreActor.h"
-
+#include "BloomConvolutionPass.h"
 #include "RenderUtils.h"
-
+#include "GPUFastFourierTransform.h"
 ABloomTensorCoreActor::ABloomTensorCoreActor()
 {
-    PrimaryActorTick.bCanEverTick = true;
-    PrimaryActorTick.bStartWithTickEnabled = true;
+    /*PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;*/
 }
 
 ABloomTensorCoreActor::~ABloomTensorCoreActor()
@@ -19,28 +19,34 @@ void ABloomTensorCoreActor::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 
 void ABloomTensorCoreActor::Tick( float DeltaTime){
     AActor::Tick(DeltaTime);
-    if (!BloomTensorCoreViewExtension && isEnabled) {
-        BloomTensorCoreViewExtension = FSceneViewExtensions::NewExtension<FBloomTensorCoreViewExtension>();
-        
-        BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
-        if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
-        {
-            CVarDebugCanvasVisible->Set(0);
-        }
-    }
-    else if (BloomTensorCoreViewExtension && !isEnabled){
-        BloomTensorCoreViewExtension = nullptr;
+	/*if (!BloomTensorCoreViewExtension && isEnabled) {
+		BloomTensorCoreViewExtension = FSceneViewExtensions::NewExtension<FBloomTensorCoreViewExtension>();
 
-        if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
-        {
-            CVarDebugCanvasVisible->Set(5);
-        }
-    }
+		BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
+		if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
+		{
+			CVarDebugCanvasVisible->Set(0);
+		}
+	}
+	else if (BloomTensorCoreViewExtension && !isEnabled){
+		BloomTensorCoreViewExtension = nullptr;
+
+		if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
+		{
+			CVarDebugCanvasVisible->Set(5);
+		}
+	}*/
 }
 
 void ABloomTensorCoreActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) {
-    if (BloomTensorCoreViewExtension)
-        BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
+	/*if (BloomTensorCoreViewExtension)
+		BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);*/
+	if (isEnabled) {
+		RegisterBloomFunc(DispatchManager::DispatchBloomConvTensorCore);
+	}
+	else {
+		UnRegisterBloomFunc();
+	}
 }
 void ABloomTensorCoreActor::BeginPlay(){
 
