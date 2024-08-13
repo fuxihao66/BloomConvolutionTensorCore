@@ -1,5 +1,9 @@
 #include "BloomTensorcoreExecuteD3D12RHI.h"
 #include "FFT_Debug.hlsl.h"
+#include "FFT_TwoForOne_2048.hlsl.h"
+#include "FFT_TwoForOne_1024.hlsl.h"
+#include "FFT_ConvWithTexture_2048.hlsl.h"
+#include "FFT_ConvWithTexture_1024.hlsl.h"
 #include "D3D12RHIPrivate.h"
 #include "D3D12Util.h"
 #include "D3D12State.h"
@@ -113,13 +117,13 @@ private:
 class FBloomTensorcoreExecuteD3D12RHI final : public BloomTensorcoreExecuteRHI
 {
 private:
-	std::unique_ptr<DescriptorHeapWrapper>        	m_DescriptorHeap;
+	std::unique_ptr<DescriptorHeapWrapper>        	m_DescriptorHeap[3];
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>		m_SM66RootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_DebugTwoForOnePSO;
 
-	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_ForwardTwoForOnePSO;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_ConvolveWithTexturePSO;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_InverseTwoForOnePSO;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_TwoForOnePSO[2];
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_ConvolveWithTexturePSO[2];
+	//Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_InverseTwoForOnePSO[2];
 
 	UINT                                            m_currentDescriptorTopIndex;
 public:
@@ -128,7 +132,7 @@ public:
 	virtual ~FBloomTensorcoreExecuteD3D12RHI();
 private:
 	BloomTensorcore_Result CreateD3D12Resources();
-
+	UINT FrameIndex = 0;
 	ID3D12Device* m_d3dDevice = nullptr;
 	ID3D12DynamicRHI* D3D12RHI = nullptr;
 };
@@ -173,12 +177,12 @@ namespace DescriptorOffsetMapping {
 
 BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 	// initialize once
-	
-	m_DescriptorHeap = std::make_unique<DescriptorHeapWrapper>(
-		m_d3dDevice,
-		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-		D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-		MAX_DESCRIPTOR_COUNT);
+	for (int i = 0; i < 3; i++)
+		m_DescriptorHeap[i] = std::make_unique<DescriptorHeapWrapper>(
+			m_d3dDevice,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+			D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+			MAX_DESCRIPTOR_COUNT);
 	m_currentDescriptorTopIndex = 0;
 	
 
@@ -220,22 +224,38 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 		PSODesc.pRootSignature = m_SM66RootSignature.Get();
 		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_DebugTwoForOnePSO)));
 	}
-	//{
-	//	D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
-	//	PSODesc.CS = { g_ForwardTwoForOne_CS, sizeof(g_ForwardTwoForOne_CS) };// include by header
-	//	PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	//	PSODesc.NodeMask = 0;
-	//	PSODesc.pRootSignature = m_SM66RootSignature.Get();
-	//	FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_ForwardTwoForOnePSO)));
-	//}
-	//{
-	//	D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
-	//	PSODesc.CS = { g_ConvolveWithTexture_CS, sizeof(g_ConvolveWithTexture_CS) };// include by header
-	//	PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	//	PSODesc.NodeMask = 0;
-	//	PSODesc.pRootSignature = m_SM66RootSignature.Get();
-	//	FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_ConvolveWithTexturePSO)));
-	//}
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
+		PSODesc.CS = { g_TwoForOneShader_1024_CS, sizeof(g_TwoForOneShader_1024_CS) };// include by header
+		PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		PSODesc.NodeMask = 0;
+		PSODesc.pRootSignature = m_SM66RootSignature.Get();
+		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_TwoForOnePSO[0])));
+	}
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
+		PSODesc.CS = { g_TwoForOneShader_2048_CS, sizeof(g_TwoForOneShader_2048_CS) };// include by header
+		PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		PSODesc.NodeMask = 0;
+		PSODesc.pRootSignature = m_SM66RootSignature.Get();
+		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_TwoForOnePSO[1])));
+	}
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
+		PSODesc.CS = { g_ConvWithTextureShader_1024_CS, sizeof(g_ConvWithTextureShader_1024_CS) };// include by header
+		PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		PSODesc.NodeMask = 0;
+		PSODesc.pRootSignature = m_SM66RootSignature.Get();
+		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_ConvolveWithTexturePSO[0])));
+	}
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
+		PSODesc.CS = { g_ConvWithTextureShader_2048_CS, sizeof(g_ConvWithTextureShader_2048_CS) };// include by header
+		PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+		PSODesc.NodeMask = 0;
+		PSODesc.pRootSignature = m_SM66RootSignature.Get();
+		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_ConvolveWithTexturePSO[1])));
+	}
 	//{
 	//	D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
 	//	PSODesc.CS = { g_InverseTwoForOne_CS, sizeof(g_InverseTwoForOne_CS) };// include by header
@@ -293,14 +313,14 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	auto Intermediate1UavHandle = Intermediate1_UAV->GetOfflineCpuHandle();
 
 	// copy srv/uav to our descriptor heap
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::SrcTexture), SrcSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::KernelTexture), KernelSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::Intermediate0), Intermediate0SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::Intermediate1), Intermediate1SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::OutputUav), OutputUavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::Intermediate0Uav), Intermediate0UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap->GetCpuHandle(DescriptorOffsetMapping::Intermediate1Uav), Intermediate1UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	ID3D12DescriptorHeap* pHeaps[] = { m_DescriptorHeap->Heap() };
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::SrcTexture), SrcSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::KernelTexture), KernelSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0), Intermediate0SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1), Intermediate1SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::OutputUav), OutputUavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0Uav), Intermediate0UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1Uav), Intermediate1UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	ID3D12DescriptorHeap* pHeaps[] = { m_DescriptorHeap[FrameIndex % 3]->Heap() };
 	D3DGraphicsCommandList->SetDescriptorHeaps(_countof(pHeaps), pHeaps);
 
 	D3DGraphicsCommandList->SetComputeRootSignature(m_SM66RootSignature.Get());
@@ -405,7 +425,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	Device->GetDefaultCommandContext().StateCache.ForceSetComputeRootSignature();*/
 
 	D3D12RHI->RHIFinishExternalComputeWork(0, D3DGraphicsCommandList); // New API
-
+	FrameIndex = (FrameIndex + 1) % 3;
 	// Device->GetCommandContext().StateCache.GetDescriptorCache()->SetCurrentCommandList(Device->GetCommandContext().CommandListHandle);
 	return BloomTensorcore_Result::Result_Success;
 }

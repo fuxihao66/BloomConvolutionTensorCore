@@ -20,7 +20,8 @@ public:
 public:
     ABloomTensorCoreActor();
     ~ABloomTensorCoreActor(); 
-
+private:
+	bool isRegistered = false;
 protected:
 
     virtual void BeginPlay() override;

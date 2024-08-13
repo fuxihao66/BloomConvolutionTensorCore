@@ -4,8 +4,8 @@
 #include "GPUFastFourierTransform.h"
 ABloomTensorCoreActor::ABloomTensorCoreActor()
 {
-    /*PrimaryActorTick.bCanEverTick = true;
-    PrimaryActorTick.bStartWithTickEnabled = true;*/
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
 ABloomTensorCoreActor::~ABloomTensorCoreActor()
@@ -19,39 +19,43 @@ void ABloomTensorCoreActor::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 
 void ABloomTensorCoreActor::Tick( float DeltaTime){
     AActor::Tick(DeltaTime);
-	/*if (!BloomTensorCoreViewExtension && isEnabled) {
-		BloomTensorCoreViewExtension = FSceneViewExtensions::NewExtension<FBloomTensorCoreViewExtension>();
+	if (!isRegistered && isEnabled) {
+		/*BloomTensorCoreViewExtension = FSceneViewExtensions::NewExtension<FBloomTensorCoreViewExtension>();
 
 		BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);
 		if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
 		{
 			CVarDebugCanvasVisible->Set(0);
-		}
+		}*/
+		RegisterBloomFunc(DispatchManager::DispatchBloomConvTensorCore);
+		isRegistered = true;
 	}
-	else if (BloomTensorCoreViewExtension && !isEnabled){
-		BloomTensorCoreViewExtension = nullptr;
+	else if (isRegistered && !isEnabled){
+		/*BloomTensorCoreViewExtension = nullptr;
 
 		if (IConsoleVariable* CVarDebugCanvasVisible = IConsoleManager::Get().FindConsoleVariable(TEXT("r.BloomQuality")))
 		{
 			CVarDebugCanvasVisible->Set(5);
-		}
-	}*/
+		}*/
+		UnRegisterBloomFunc();
+		isRegistered = false;
+	}
 }
 
 void ABloomTensorCoreActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) {
 	/*if (BloomTensorCoreViewExtension)
 		BloomTensorCoreViewExtension->ResetConvolutionProperty(Convolution);*/
-	if (isEnabled) {
+	/*if (isEnabled) {
 		RegisterBloomFunc(DispatchManager::DispatchBloomConvTensorCore);
 	}
 	else {
 		UnRegisterBloomFunc();
-	}
+	}*/
 }
 void ABloomTensorCoreActor::BeginPlay(){
 
     Super::BeginPlay();
-    //RegisterActorTickFunctions(true);
+    RegisterActorTickFunctions(true);
     // if (BloomConvolutionTexture == nullptr)
     // {
     //     GEngine->LoadDefaultBloomTexture();
