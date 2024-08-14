@@ -126,6 +126,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_TwoForOnePSO[2];
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_ConvolveWithTexturePSO[2];
 	//Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_InverseTwoForOnePSO[2];
+	Microsoft::WRL::ComPtr<ID3D12Resource>          m_Intermediate0;
+	Microsoft::WRL::ComPtr<ID3D12Resource>          m_Intermediate1;
+
 	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer_Upload;
 	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer_Inverse;
@@ -278,6 +281,42 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_ConvolveWithTexturePSO[1])));
 	}
 	{
+		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, 2050, 2050, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		auto DefaultProperty = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+		m_d3dDevice->CreateCommittedResource(&DefaultProperty,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+			nullptr,
+			IID_PPV_ARGS(m_Intermediate0.ReleaseAndGetAddressOf()));
+		m_d3dDevice->CreateCommittedResource(&DefaultProperty,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+			nullptr,
+			IID_PPV_ARGS(m_Intermediate1.ReleaseAndGetAddressOf()));
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+
+		m_d3dDevice->CreateShaderResourceView(m_Intermediate0.Get(), &srvDesc, m_CPUDescriptorHeap->GetCpuHandle(2));
+		m_d3dDevice->CreateShaderResourceView(m_Intermediate1.Get(), &srvDesc, m_CPUDescriptorHeap->GetCpuHandle(3));
+		
+		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+		uavDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		uavDesc.Texture2D.MipSlice = 0;
+
+		m_d3dDevice->CreateUnorderedAccessView(m_Intermediate0.Get(), nullptr, &uavDesc, m_CPUDescriptorHeap->GetCpuHandle(4));
+		m_d3dDevice->CreateUnorderedAccessView(m_Intermediate1.Get(), nullptr, &uavDesc, m_CPUDescriptorHeap->GetCpuHandle(5));
+
+	}
+	{
 
 		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(256 * /*real & imag*/2 * /*2 merge step*/2 * sizeof(uint16_t), D3D12_RESOURCE_FLAG_NONE);
 
@@ -413,8 +452,8 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	FD3D12Texture* const IntermediateTexture1D3D12 = DefaultContext.RetrieveTexture(InArguments.Intermediate1);*/
 	FD3D12Texture* const SrcTextureD3D12 = (FD3D12Texture* const)(InArguments.SrcTexture);
 	FD3D12Texture* const KernelTextureD3D12 = (FD3D12Texture* const)(InArguments.KernelTexture);
-	FD3D12Texture* const IntermediateTexture0D3D12 = (FD3D12Texture* const)(InArguments.Intermediate0);
-	FD3D12Texture* const IntermediateTexture1D3D12 = (FD3D12Texture* const)(InArguments.Intermediate1);
+	/*FD3D12Texture* const IntermediateTexture0D3D12 = (FD3D12Texture* const)(InArguments.Intermediate0);
+	FD3D12Texture* const IntermediateTexture1D3D12 = (FD3D12Texture* const)(InArguments.Intermediate1);*/
 
 	/*FD3D12UnorderedAccessView* OutputUAV = DefaultContext.RetrieveObject<>(InArguments.OutputTexture);
 	FD3D12UnorderedAccessView* Intermediate0_UAV = DefaultContext.RetrieveObject<FD3D12UnorderedAccessView_RHI>(InArguments.Intermediate0_UAV);
@@ -423,26 +462,34 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	FD3D12ShaderResourceView* const PostFilterParaSrv = static_cast<FD3D12ShaderResourceView*>((FD3D12ShaderResourceView_RHI*)InArguments.PostFilterParaBuffer);
 
 	FD3D12UnorderedAccessView* const OutputUAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.OutputTexture);
-	FD3D12UnorderedAccessView* const Intermediate0_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate0_UAV);
-	FD3D12UnorderedAccessView* const Intermediate1_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate1_UAV);
+	/*FD3D12UnorderedAccessView* const Intermediate0_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate0_UAV);
+	FD3D12UnorderedAccessView* const Intermediate1_UAV = static_cast<FD3D12UnorderedAccessView*>((FD3D12UnorderedAccessView_RHI*)InArguments.Intermediate1_UAV);*/
 	
 	auto SrcSrvHandle = SrcTextureD3D12->GetShaderResourceView()->GetOfflineCpuHandle();
 	auto KernelSrvHandle = KernelTextureD3D12->GetShaderResourceView()->GetOfflineCpuHandle();
-	auto Intermediate0SrvHandle = IntermediateTexture0D3D12->GetShaderResourceView()->GetOfflineCpuHandle();
-	auto Intermediate1SrvHandle = IntermediateTexture1D3D12->GetShaderResourceView()->GetOfflineCpuHandle();
+	/*auto Intermediate0SrvHandle = IntermediateTexture0D3D12->GetShaderResourceView()->GetOfflineCpuHandle();
+	auto Intermediate1SrvHandle = IntermediateTexture1D3D12->GetShaderResourceView()->GetOfflineCpuHandle();*/
 	auto PostFilterParaSrvHandle = PostFilterParaSrv->GetOfflineCpuHandle();
 	auto OutputUavHandle = OutputUAV->GetOfflineCpuHandle();
-	auto Intermediate0UavHandle = Intermediate0_UAV->GetOfflineCpuHandle();
-	auto Intermediate1UavHandle = Intermediate1_UAV->GetOfflineCpuHandle();
+	/*auto Intermediate0UavHandle = Intermediate0_UAV->GetOfflineCpuHandle();
+	auto Intermediate1UavHandle = Intermediate1_UAV->GetOfflineCpuHandle();*/
 
 	// copy srv/uav to our descriptor heap
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::SrcTexture), SrcSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::KernelTexture), KernelSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0), Intermediate0SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	/*m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0), Intermediate0SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1), Intermediate1SrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	*/
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0), m_CPUDescriptorHeap->GetCpuHandle(2), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1), m_CPUDescriptorHeap->GetCpuHandle(3), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::OutputUav), OutputUavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0Uav), Intermediate0UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	/*m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0Uav), Intermediate0UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1Uav), Intermediate1UavHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	*/
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate0Uav), m_CPUDescriptorHeap->GetCpuHandle(4), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::Intermediate1Uav), m_CPUDescriptorHeap->GetCpuHandle(5), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::PostFilterPara), PostFilterParaSrvHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	
 	
@@ -502,7 +549,16 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		}
 		cachedScanLineLenght = ScanLineLength;
 	}
-	
+	{
+		D3D12_RESOURCE_BARRIER BarrierDesc = {};
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = m_Intermediate0.Get();
+		BarrierDesc.Transition.Subresource = 0;
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS ;
+		D3DGraphicsCommandList->ResourceBarrier(1, &BarrierDesc);
+	}
 	// two for one
 	{
 		struct Params {
@@ -537,13 +593,22 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		D3D12_RESOURCE_BARRIER BarrierDesc = {};
 		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		BarrierDesc.Transition.pResource = D3D12RHI->RHIGetResource(InArguments.Intermediate0);
+		BarrierDesc.Transition.pResource = m_Intermediate0.Get();
 		BarrierDesc.Transition.Subresource = 0;
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		D3DGraphicsCommandList->ResourceBarrier(1, &BarrierDesc);
 	}
-	
+	{
+		D3D12_RESOURCE_BARRIER BarrierDesc = {};
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = m_Intermediate1.Get();
+		BarrierDesc.Transition.Subresource = 0;
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS ;
+		D3DGraphicsCommandList->ResourceBarrier(1, &BarrierDesc);
+	}
 	// convolve with texture
 	{
 		struct Params {
@@ -574,7 +639,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		D3D12_RESOURCE_BARRIER BarrierDesc = {};
 		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		BarrierDesc.Transition.pResource = D3D12RHI->RHIGetResource(InArguments.Intermediate1);
+		BarrierDesc.Transition.pResource = m_Intermediate1.Get();
 		BarrierDesc.Transition.Subresource = 0;
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
