@@ -29,10 +29,12 @@ struct FBloomRHIExecuteArguments
 	FRHITexture* SrcTexture = nullptr; 
 	FRHITexture* KernelTexture = nullptr; 
 	FRHITexture* Intermediate0 = nullptr; 
-	FRHITexture* Intermediate1 = nullptr; 
+	FRHITexture* Intermediate1 = nullptr;
+	FRHIShaderResourceView* PostFilterParaBuffer = nullptr;
 	FRHIUnorderedAccessView* OutputTexture = nullptr; 
 	FRHIUnorderedAccessView* Intermediate0_UAV = nullptr; 
 	FRHIUnorderedAccessView* Intermediate1_UAV = nullptr; 
+	FVector3f BrightPixelGain;
 	uint32 ViewportWidth;
 	uint32 ViewportHeight;
 	uint32 GPUNode = 0;

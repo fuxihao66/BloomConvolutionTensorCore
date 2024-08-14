@@ -2,7 +2,7 @@
 
 #include "Modules/ModuleManager.h"
 #include "BloomTensorcoreExecuteRHI.h"
-#define MAX_DESCRIPTOR_COUNT 100000
+#define MAX_DESCRIPTOR_COUNT 16
 
 
 class FBloomTensorcoreExecuteD3D12RHIModule final : public IBloomTensorcoreExecuteRHIModule
