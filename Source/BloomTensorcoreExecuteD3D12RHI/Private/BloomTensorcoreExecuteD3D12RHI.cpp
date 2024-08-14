@@ -128,7 +128,12 @@ private:
 	//Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_InverseTwoForOnePSO[2];
 	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer_Upload;
-	uint16_t										FBufferData[256 * 4];
+	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer_Inverse;
+	Microsoft::WRL::ComPtr<ID3D12Resource>          m_FBuffer_Inverse_Upload;
+	uint16_t										FBufferData_1024[256 * 4];
+	uint16_t										FBufferData_Inverse_1024[256 * 4];
+	uint16_t										FBufferData_2048[256 * 4];
+	uint16_t										FBufferData_Inverse_2048[256 * 4];
 	UINT                                            m_currentDescriptorTopIndex;
 public:
 	FBloomTensorcoreExecuteD3D12RHI(const FBloomTensorcoreExecuteRHICreateArguments& Arguments);
@@ -138,6 +143,7 @@ private:
 	BloomTensorcore_Result CreateD3D12Resources();
 	UINT FrameIndex = 0;
 	bool initialized = false;
+	UINT cachedScanLineLenght = 0;
 	ID3D12Device* m_d3dDevice = nullptr;
 	ID3D12DynamicRHI* D3D12RHI = nullptr;
 };
@@ -178,6 +184,7 @@ namespace DescriptorOffsetMapping {
 		Intermediate1Uav,
 		PostFilterPara,
 		FBuffer,
+		FBufferInverse,
 		DescriptorMax
 	};
 }
@@ -274,30 +281,97 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 
 		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(256 * /*real & imag*/2 * /*2 merge step*/2 * sizeof(uint16_t), D3D12_RESOURCE_FLAG_NONE);
 
-		m_d3dDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		auto DefaultProperty = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto UploadtProperty = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Buffer.NumElements = resourceDesc.Width / 4;
+		srvDesc.Buffer.StructureByteStride = 0;
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+		m_d3dDevice->CreateCommittedResource(&DefaultProperty,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(m_FBuffer.ReleaseAndGetAddressOf()));
 
-		m_d3dDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		m_d3dDevice->CreateCommittedResource(&UploadtProperty,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(m_FBuffer_Upload.ReleaseAndGetAddressOf()));
 		
-		m_d3dDevice->CreateShaderResourceView(m_FBuffer.Get(), nullptr, m_CPUDescriptorHeap->GetCpuHandle(0));
+		m_d3dDevice->CreateShaderResourceView(m_FBuffer.Get(), &srvDesc, m_CPUDescriptorHeap->GetCpuHandle(0));
 
+		m_d3dDevice->CreateCommittedResource(&DefaultProperty,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(m_FBuffer_Inverse.ReleaseAndGetAddressOf()));
+
+		m_d3dDevice->CreateCommittedResource(&UploadtProperty,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(m_FBuffer_Inverse_Upload.ReleaseAndGetAddressOf()));
+
+		m_d3dDevice->CreateShaderResourceView(m_FBuffer_Inverse.Get(), &srvDesc, m_CPUDescriptorHeap->GetCpuHandle(1));
+
+		// i for row index and j for col index
 		for (int i = 0; i < 16; i++) {
 			for (int j = 0; j < 16; j++) {
-				FBufferData[] = Float16Compressor::compress();
+				UINT FlattenedIndex = i * 16 + j;
+
+				float Expo = -2.f * PI * float(i) * float(j) / 16.f;
+				FBufferData_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(Expo));
+				FBufferData_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(Expo));
+				FBufferData_Inverse_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(-Expo));
+				FBufferData_Inverse_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(-Expo));
+
+				FBufferData_2048[FlattenedIndex] = FBufferData_1024[FlattenedIndex];
+				FBufferData_2048[FlattenedIndex + 256] = FBufferData_1024[FlattenedIndex + 256];
+				FBufferData_Inverse_2048[FlattenedIndex] = FBufferData_Inverse_1024[FlattenedIndex];
+				FBufferData_Inverse_2048[FlattenedIndex + 256] = FBufferData_Inverse_1024[FlattenedIndex + 256];
 			}
 		}
 		for (int i = 0; i < 16; i++) {
 			for (int j = 0; j < 16; j++) {
-				FBufferData[] = Float16Compressor::compress();
+				UINT FlattenedIndex = i * 16 + j;
+				if (i > 4 || j > 4) {
+					FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+					FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+					FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+					FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+				}
+				else {
+					float Expo = -2.f * PI * float(i) * float(j) / 4.f;
+
+					FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
+					FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
+					FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
+					FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
+				}
+				if (i > 8 || j > 8) {
+					FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+					FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+					FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+					FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+				}
+				else{
+					float Expo = -2.f * PI * float(i) * float(j) / 8.f;
+
+					FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
+					FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
+					FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
+					FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
+				}
 			}
 		}
 	}
@@ -373,6 +447,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 	
 	
 	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::FBuffer), m_CPUDescriptorHeap->GetCpuHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_d3dDevice->CopyDescriptorsSimple(1, m_DescriptorHeap[FrameIndex % 3]->GetCpuHandle(DescriptorOffsetMapping::FBufferInverse), m_CPUDescriptorHeap->GetCpuHandle(1), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	ID3D12DescriptorHeap* pHeaps[] = { m_DescriptorHeap[FrameIndex % 3]->Heap() };
 	D3DGraphicsCommandList->SetDescriptorHeaps(_countof(pHeaps), pHeaps);
 
@@ -408,19 +483,26 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		UseAlpha = 0x8
 	};
 
-	if (!initialized) {
-		D3D12_SUBRESOURCE_DATA bufferData = {};
-		bufferData.pData = FBufferData;
-		UpdateSubresources(D3DGraphicsCommandList, m_FBuffer.Get(), m_FBuffer_Upload.Get(), 0, 0, 1, &bufferData);
-		initialized = true;
-	}
-	
-
 	const UINT MaxLength = FMath::Max(InArguments.ViewportWidth, InArguments.ViewportHeight);
 	const bool SCAN_LINE_LENGTH_1024 = (MaxLength > 512 && MaxLength <= 1024);
 	const bool SCAN_LINE_LENGTH_2048 = (MaxLength > 1024 && MaxLength <= 2048);
 
 	const UINT ScanLineLength = SCAN_LINE_LENGTH_2048 ? 2048 : 1024;
+
+	if (cachedScanLineLenght != ScanLineLength) {
+		{
+			D3D12_SUBRESOURCE_DATA bufferData = {};
+			bufferData.pData = SCAN_LINE_LENGTH_1024 ? FBufferData_1024 : FBufferData_2048;
+			UpdateSubresources(D3DGraphicsCommandList, m_FBuffer.Get(), m_FBuffer_Upload.Get(), 0, 0, 1, &bufferData);
+		}
+		{
+			D3D12_SUBRESOURCE_DATA bufferData = {};
+			bufferData.pData = SCAN_LINE_LENGTH_1024 ? FBufferData_Inverse_1024 : FBufferData_Inverse_2048;
+			UpdateSubresources(D3DGraphicsCommandList, m_FBuffer_Inverse.Get(), m_FBuffer_Inverse_Upload.Get(), 0, 0, 1, &bufferData);
+		}
+		cachedScanLineLenght = ScanLineLength;
+	}
+	
 	// two for one
 	{
 		struct Params {
@@ -433,6 +515,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 			UINT OutputTextureOffset;
 			UINT DstPostFilterParaOffset;
 			UINT FBufferOffset;
+			UINT FBufferInverseOffset;
 		};
 		Params p;
 		p.DstRect = FInt32Vector4(0, 0, ScanLineLength + 2, InArguments.ViewportHeight);
@@ -444,6 +527,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		p.OutputTextureOffset = DescriptorOffsetMapping::Intermediate0Uav;
 		p.DstPostFilterParaOffset = DescriptorOffsetMapping::PostFilterPara;
 		p.FBufferOffset = DescriptorOffsetMapping::FBuffer;
+		p.FBufferInverseOffset = DescriptorOffsetMapping::FBufferInverse;
 		D3DGraphicsCommandList->SetComputeRoot32BitConstants(0, sizeof(Params) / sizeof(UINT), &p, 0);
 		D3DGraphicsCommandList->SetPipelineState(m_TwoForOnePSO[SCAN_LINE_LENGTH_2048].Get());
 
@@ -470,15 +554,17 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 			UINT FilterTextureOffset;
 			UINT OutputTextureOffset;
 			UINT FBufferOffset;
+			UINT FBufferInverseOffset;
 		};
 		Params p;
-		p.SrcRectMax = ;
-		p.DstExtent = ;
+		p.SrcRectMax = FInt32Vector2(ScanLineLength + 2, InArguments.ViewportHeight);
+		p.DstExtent = FInt32Vector2(ScanLineLength + 2, InArguments.ViewportHeight);
 		p.TransformType = Forward | UseAlpha;
 		p.InputTextureOffset = DescriptorOffsetMapping::Intermediate0;
 		p.FilterTextureOffset = DescriptorOffsetMapping::KernelTexture;
 		p.OutputTextureOffset = DescriptorOffsetMapping::Intermediate1Uav;
 		p.FBufferOffset = DescriptorOffsetMapping::FBuffer;
+		p.FBufferInverseOffset = DescriptorOffsetMapping::FBufferInverse;
 		D3DGraphicsCommandList->SetComputeRoot32BitConstants(0, sizeof(Params) / sizeof(UINT), &p, 0);
 		D3DGraphicsCommandList->SetPipelineState(m_ConvolveWithTexturePSO[SCAN_LINE_LENGTH_2048].Get());
 
@@ -508,17 +594,19 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 			UINT OutputTextureOffset;
 			UINT DstPostFilterParaOffset;
 			UINT FBufferOffset;
+			UINT FBufferInverseOffset;
 		};
 		Params p;
-		p.DstRect = ;
-		p.BrightPixelGain = ;
+		p.DstRect = FInt32Vector4(0, 0, InArguments.ViewportWidth, InArguments.ViewportHeight);
+		p.BrightPixelGain = InArguments.BrightPixelGain;
 		p.Width = InArguments.ViewportWidth;
 		p.Height = InArguments.ViewportHeight;
 		p.TransformType = Horizontal | ModifyInput;
 		p.InputTextureOffset = DescriptorOffsetMapping::Intermediate1;
 		p.OutputTextureOffset = DescriptorOffsetMapping::OutputUav;
-		p.DstPostFilterParaOffset = ;
+		p.DstPostFilterParaOffset = DescriptorOffsetMapping::PostFilterPara;
 		p.FBufferOffset = DescriptorOffsetMapping::FBuffer;
+		p.FBufferInverseOffset = DescriptorOffsetMapping::FBufferInverse;
 		D3DGraphicsCommandList->SetComputeRoot32BitConstants(0, sizeof(Params) / sizeof(UINT), &p, 0);
 		D3DGraphicsCommandList->SetPipelineState(m_TwoForOnePSO[SCAN_LINE_LENGTH_2048].Get());
 

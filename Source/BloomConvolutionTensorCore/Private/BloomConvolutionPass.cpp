@@ -9,6 +9,7 @@
 #include "ShaderParameterUtils.h"
 #include "Shader.h"
 #include "MeshMaterialShader.h"
+#include "SystemTextures.h"
 //#include "PostProcess/PostProcessing.h"
 
 BEGIN_SHADER_PARAMETER_STRUCT(FTensorcoreBloomParameters, )
@@ -39,6 +40,10 @@ void DispatchManager::DispatchBloomConvTensorCore(FRDGBuilder& GraphBuilder,
 	auto IntermediateTexture1 = GraphBuilder.CreateTexture(IntermediateTexture1Desc, TEXT("Bloom Intermediate1"));
     // init params
 
+	if (!PostFilterPara)
+	{
+		PostFilterPara = GSystemTextures.GetDefaultStructuredBuffer(GraphBuilder, sizeof(FVector4f), FVector4f(1.0f, 1.0f, 1.0f, 1.0f));
+	}
 
     FBloomConvolutionTensorCoreModule* LocalModuleRef = &FModuleManager::LoadModuleChecked<FBloomConvolutionTensorCoreModule>("BloomConvolutionTensorCore"); // load module
     BloomTensorcoreExecuteRHI* LocalRHIExtensions = LocalModuleRef->GetBloomTensorcoreExecuteRHIRef();
