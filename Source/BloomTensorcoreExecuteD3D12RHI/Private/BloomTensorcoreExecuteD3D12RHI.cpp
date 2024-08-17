@@ -1,5 +1,5 @@
 #include "BloomTensorcoreExecuteD3D12RHI.h"
-#include "FFT_Debug.hlsl.h"
+//#include "FFT_Debug.hlsl.h"
 #include "FFT_TwoForOne_2048.hlsl.h"
 #include "FFT_TwoForOne_1024.hlsl.h"
 #include "FFT_ConvWithTexture_2048.hlsl.h"
@@ -19,7 +19,7 @@
 #include "Interfaces/IPluginManager.h"
 
 #include <cassert>
-
+#include <fstream>
 
 DEFINE_LOG_CATEGORY_STATIC(LogBloomTensorcoreExecuteD3D12RHI, Log, All);
 
@@ -121,7 +121,7 @@ private:
 	std::unique_ptr<DescriptorHeapWrapper>        	m_DescriptorHeap[3];
 	std::unique_ptr<DescriptorHeapWrapper>        	m_CPUDescriptorHeap;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>		m_SM66RootSignature;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_DebugTwoForOnePSO;
+	//Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_DebugTwoForOnePSO;
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_TwoForOnePSO[2];
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>		m_ConvolveWithTexturePSO[2];
@@ -193,6 +193,10 @@ namespace DescriptorOffsetMapping {
 }
 
 BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
+
+	FString BaseDir = IPluginManager::Get().FindPlugin("BloomConvolutionTensorCore")->GetBaseDir();
+	FString FMatrixDir = FPaths::Combine(*BaseDir, TEXT("Content/"));
+
 	// initialize once
 	for (int i = 0; i < 3; i++)
 		m_DescriptorHeap[i] = std::make_unique<DescriptorHeapWrapper>(
@@ -240,14 +244,14 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 		FAILED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
 		FAILED(m_d3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_SM66RootSignature)));
 	}
-	{
-		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
-		PSODesc.CS = { g_DebugShader_CS, sizeof(g_DebugShader_CS) };// include by header
-		PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-		PSODesc.NodeMask = 0;
-		PSODesc.pRootSignature = m_SM66RootSignature.Get();
-		FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_DebugTwoForOnePSO)));
-	}
+	//{
+	//	D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
+	//	PSODesc.CS = { g_DebugShader_CS, sizeof(g_DebugShader_CS) };// include by header
+	//	PSODesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	//	PSODesc.NodeMask = 0;
+	//	PSODesc.pRootSignature = m_SM66RootSignature.Get();
+	//	FAILED(m_d3dDevice->CreateComputePipelineState(&PSODesc, IID_PPV_ARGS(&m_DebugTwoForOnePSO)));
+	//}
 	{
 		D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
 		PSODesc.CS = { g_TwoForOneShader_1024_CS, sizeof(g_TwoForOneShader_1024_CS) };// include by header
@@ -363,56 +367,89 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::CreateD3D12Resources(){
 
 		m_d3dDevice->CreateShaderResourceView(m_FBuffer_Inverse.Get(), &srvDesc, m_CPUDescriptorHeap->GetCpuHandle(1));
 
-		// i for row index and j for col index
-		for (int i = 0; i < 16; i++) {
-			for (int j = 0; j < 16; j++) {
-				UINT FlattenedIndex = i * 16 + j;
-
-				float Expo = -2.f * PI * float(i) * float(j) / 16.f;
-				FBufferData_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(Expo));
-				FBufferData_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(Expo));
-				FBufferData_Inverse_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(-Expo));
-				FBufferData_Inverse_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(-Expo));
-
-				FBufferData_2048[FlattenedIndex] = FBufferData_1024[FlattenedIndex];
-				FBufferData_2048[FlattenedIndex + 256] = FBufferData_1024[FlattenedIndex + 256];
-				FBufferData_Inverse_2048[FlattenedIndex] = FBufferData_Inverse_1024[FlattenedIndex];
-				FBufferData_Inverse_2048[FlattenedIndex + 256] = FBufferData_Inverse_1024[FlattenedIndex + 256];
-			}
+		{
+			FString FMatrixPath = FPaths::Combine(*FMatrixDir, TEXT("f_1024.txt"));
+			wchar_t* MyWCharPtr = (wchar_t*)*FMatrixPath;
+			std::ifstream myfile;
+			myfile.open(MyWCharPtr);
+			myfile.read(reinterpret_cast<char*>(FBufferData_1024), std::streamsize(256 * 4 * sizeof(uint16_t)));
+			myfile.close();
 		}
-		for (int i = 0; i < 16; i++) {
-			for (int j = 0; j < 16; j++) {
-				UINT FlattenedIndex = i * 16 + j;
-				if (i > 4 || j > 4) {
-					FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
-					FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
-					FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
-					FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
-				}
-				else {
-					float Expo = -2.f * PI * float(i) * float(j) / 4.f;
-
-					FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
-					FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
-					FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
-					FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
-				}
-				if (i > 8 || j > 8) {
-					FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
-					FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
-					FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
-					FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
-				}
-				else{
-					float Expo = -2.f * PI * float(i) * float(j) / 8.f;
-
-					FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
-					FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
-					FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
-					FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
-				}
-			}
+		{
+			FString FMatrixPath = FPaths::Combine(*FMatrixDir, TEXT("f_inv_1024.txt"));
+			wchar_t* MyWCharPtr = (wchar_t*)*FMatrixPath;
+			std::ifstream myfile;
+			myfile.open(MyWCharPtr);
+			myfile.read(reinterpret_cast<char*>(FBufferData_Inverse_1024), std::streamsize(256 * 4 * sizeof(uint16_t)));
+			myfile.close();
 		}
+		{
+			FString FMatrixPath = FPaths::Combine(*FMatrixDir, TEXT("f_2048.txt"));
+			wchar_t* MyWCharPtr = (wchar_t*)*FMatrixPath;
+			std::ifstream myfile;
+			myfile.open(MyWCharPtr);
+			myfile.read(reinterpret_cast<char*>(FBufferData_2048), std::streamsize(256 * 4 * sizeof(uint16_t)));
+			myfile.close();
+		}
+		{
+			FString FMatrixPath = FPaths::Combine(*FMatrixDir, TEXT("f_inv_2048.txt"));
+			wchar_t* MyWCharPtr = (wchar_t*)*FMatrixPath;
+			std::ifstream myfile;
+			myfile.open(MyWCharPtr);
+			myfile.read(reinterpret_cast<char*>(FBufferData_Inverse_2048), std::streamsize(256 * 4 * sizeof(uint16_t)));
+			myfile.close();
+		}
+
+		//// i for row index and j for col index
+		//for (int i = 0; i < 16; i++) {
+		//	for (int j = 0; j < 16; j++) {
+		//		UINT FlattenedIndex = i * 16 + j;
+
+		//		float Expo = -2.f * PI * float(i) * float(j) / 16.f;
+		//		FBufferData_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(Expo));
+		//		FBufferData_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(Expo));
+		//		FBufferData_Inverse_1024[FlattenedIndex] = Float16Compressor::compress(std::cos(-Expo));
+		//		FBufferData_Inverse_1024[FlattenedIndex + 256] = Float16Compressor::compress(std::sin(-Expo));
+
+		//		FBufferData_2048[FlattenedIndex] = FBufferData_1024[FlattenedIndex];
+		//		FBufferData_2048[FlattenedIndex + 256] = FBufferData_1024[FlattenedIndex + 256];
+		//		FBufferData_Inverse_2048[FlattenedIndex] = FBufferData_Inverse_1024[FlattenedIndex];
+		//		FBufferData_Inverse_2048[FlattenedIndex + 256] = FBufferData_Inverse_1024[FlattenedIndex + 256];
+		//	}
+		//}
+		//for (int i = 0; i < 16; i++) {
+		//	for (int j = 0; j < 16; j++) {
+		//		UINT FlattenedIndex = i * 16 + j;
+		//		if (i > 4 || j > 4) {
+		//			FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+		//			FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+		//			FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+		//			FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+		//		}
+		//		else {
+		//			float Expo = -2.f * PI * float(i) * float(j) / 4.f;
+
+		//			FBufferData_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
+		//			FBufferData_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
+		//			FBufferData_Inverse_1024[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
+		//			FBufferData_Inverse_1024[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
+		//		}
+		//		if (i > 8 || j > 8) {
+		//			FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+		//			FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+		//			FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(0.f);
+		//			FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(0.f);
+		//		}
+		//		else{
+		//			float Expo = -2.f * PI * float(i) * float(j) / 8.f;
+
+		//			FBufferData_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(Expo));
+		//			FBufferData_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(Expo));
+		//			FBufferData_Inverse_2048[FlattenedIndex + 512] = Float16Compressor::compress(std::cos(-Expo));
+		//			FBufferData_Inverse_2048[FlattenedIndex + 768] = Float16Compressor::compress(std::sin(-Expo));
+		//		}
+		//	}
+		//}
 	}
 	//{
 	//	D3D12_COMPUTE_PIPELINE_STATE_DESC PSODesc = {};
@@ -664,7 +701,7 @@ BloomTensorcore_Result FBloomTensorcoreExecuteD3D12RHI::ExecuteBloomTensorcore(F
 		Params p;
 		p.DstRect = FInt32Vector4(0, 0, InArguments.ViewportWidth, InArguments.ViewportHeight);
 		p.BrightPixelGain = InArguments.BrightPixelGain;
-		p.Width = InArguments.ViewportWidth;
+		p.Width = ScanLineLength + 2;
 		p.Height = InArguments.ViewportHeight;
 		p.TransformType = Horizontal | ModifyInput;
 		p.InputTextureOffset = DescriptorOffsetMapping::Intermediate1;
